@@ -1,5 +1,7 @@
 var async = require('async');
 var fs = require('fs');
+
+// save HARs in data folder (e.g. "data/report1.json")
 var files = fs.readdirSync('data');
 
 // read the files
