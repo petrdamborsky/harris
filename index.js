@@ -28,35 +28,51 @@ async.map(
 	function (err, files) {
 		if (err)
 			throw err;
-
-		var summary = {};
-		var logFormat = 'Waiting %d seconds for %s';
-
-		files.forEach(function (f, i) {
-			var har = JSON.parse(f);
-			var entries = har.log.entries;
-			
-			// weak/simple way of filtering out the xhrs
-			var xhrs = _.filter(entries, { response: { content: { mimeType: 'application/json' } } });
-			
-			// console.log(util.format('%d. HAR',i));
-			_.forEach(_.sortByOrder(xhrs, 'timings.wait', 'desc'), function (item) {
-				// saving to summary
-				var newValue = Math.floor(parseFloat(item.timings.wait));
-				summary[item.request.url] = summary[item.request.url] ? parseInt(summary[item.request.url], 10) : 0;
-				summary[item.request.url] += newValue;
-				// debug output
-				// console.log(util.format(logFormat, (item.timings.wait/1000).toPrecision(2), item.request.url));
-			});
-		});
-		
-		// process summary
-		console.log('Summary of average waiting times:');
-		
-		// TODO: orderby
-		for (prop in summary) {
-			var avg = summary[prop] / Object.getOwnPropertyNames(summary).length
-			console.log(util.format(logFormat, (avg / 1000).toPrecision(3), prop));
-		}
+		analyzeFiles(files);
 	}
 	);
+
+function analyzeFiles(files) {
+
+	var summaries = [];
+	var logFormat = 'Average of %d seconds for %s';
+	
+	// get all the xhr entries and their wait times
+	files.forEach(function (f, i) {
+		var har = JSON.parse(f);
+		var xhrs = getXhrsEntries(har);
+
+		_.forEach(xhrs, function (xhr) {
+			summaries.push({ url: xhr.request.url, wait: parseFloat(xhr.timings.wait) });
+		})
+	});
+	
+	// group the entries by url
+	var groupedObject = _.groupBy(summaries, 'url');
+	
+	// I am creating an array here, because I need it to sort the results
+	var groupedArray = [];
+	
+	// get the avg wait time for each url
+	_.forOwn(groupedObject, function(value,key){
+		var waitTime = _.sum(value, 'wait');
+		waitTime = Math.floor(waitTime);
+		var entriesCount = _.keys(groupedObject).length;
+		groupedArray.push({url: key, avgWaitTime: Math.floor(waitTime/entriesCount)/1000});
+	});
+	
+	// sort the results by highest average wait time
+	var sorted = _.sortByOrder(groupedArray, 'avgWaitTime', 'desc');
+	
+	_.forEach(sorted, function(s){
+		console.log(util.format(logFormat, s.avgWaitTime, s.url));
+	});
+}
+
+// I want to get just the x-http-requests for data
+// This is just a weak filter, until I find better one
+function getXhrsEntries(har) {
+	var entries = har.log.entries;
+	var xhrs = _.filter(entries, { response: { content: { mimeType: 'application/json' } } });
+	return xhrs;
+}
