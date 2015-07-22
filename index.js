@@ -35,7 +35,7 @@ async.map(
 function analyzeFiles(files) {
 
 	var summaries = [];
-	var logFormat = 'Average of %d seconds for %s';
+	var logFormat = 'Average of %ds during %d requests to %s';
 	
 	// get all the xhr entries and their wait times
 	files.forEach(function (f, i) {
@@ -55,17 +55,16 @@ function analyzeFiles(files) {
 	
 	// get the avg wait time for each url
 	_.forOwn(groupedObject, function(value,key){
-		var waitTime = _.sum(value, 'wait');
-		waitTime = Math.floor(waitTime);
-		var entriesCount = _.keys(groupedObject).length;
-		groupedArray.push({url: key, avgWaitTime: Math.floor(waitTime/entriesCount)/1000});
+		var waitTime = Math.floor(_.sum(value, 'wait'));
+		var avgWaitTime = Math.floor(waitTime/value.length)/1000;
+		groupedArray.push({url: key, avgWaitTime: avgWaitTime, entriesCount: value.length});
 	});
 	
 	// sort the results by highest average wait time
 	var sorted = _.sortByOrder(groupedArray, 'avgWaitTime', 'desc');
 	
 	_.forEach(sorted, function(s){
-		console.log(util.format(logFormat, s.avgWaitTime, s.url));
+		console.log(util.format(logFormat, s.avgWaitTime, s.entriesCount, s.url));
 	});
 }
 
